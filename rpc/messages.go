@@ -16,7 +16,7 @@ type Envelope struct {
 	Method  string          `json:"method,omitempty"`
 	Params  json.RawMessage `json:"params,omitempty"`
 	Result  json.RawMessage `json:"result,omitempty"`
-	Error   *ResponseError  `json:"error,omitempty"`
+	Error   error           `json:"error,omitempty"`
 }
 
 // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#requestMessage
@@ -32,7 +32,7 @@ type ResponseMessage struct {
 	Version string          `json:"jsonrpc"`
 	ID      any             `json:"id"`
 	Result  json.RawMessage `json:"result,omitempty"`
-	Error   *ResponseError  `json:"error,omitempty"`
+	Error   error           `json:"error,omitempty"`
 }
 
 // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notificationMessage
@@ -42,22 +42,45 @@ type NotificationMessage struct {
 	Params  json.RawMessage `json:"params,omitempty"`
 }
 
+func NewResponse(id any, result any, err error) (*ResponseMessage, error) {
+	r, _err := marshalRawMessage(result)
+	return &ResponseMessage{ID: id, Result: r, Error: err}, _err
+}
+
+func NewNotification(m string, params any) (*NotificationMessage, error) {
+	ps, err := marshalRawMessage(params)
+	return &NotificationMessage{Method: m, Params: ps}, err
+}
+
 func (m RequestMessage) marshal(ptr *Envelope) {
-	m.Version = ptr.Version
-	m.ID = ptr.ID
-	m.Method = ptr.Method
-	m.Params = ptr.Params
+	ptr.Version = m.Version
+	ptr.ID = m.ID
+	ptr.Method = m.Method
+	ptr.Params = m.Params
 }
 
 func (m ResponseMessage) marshal(ptr *Envelope) {
-	m.Version = ptr.Version
-	m.ID = ptr.ID
-	m.Result = ptr.Result
-	m.Error = ptr.Error
+	ptr.Version = m.Version
+	ptr.ID = m.ID
+	ptr.Result = m.Result
+	ptr.Error = m.Error
 }
 
 func (m NotificationMessage) marshal(ptr *Envelope) {
-	m.Version = ptr.Version
-	m.Method = ptr.Method
-	m.Params = ptr.Params
+	ptr.Version = m.Version
+	ptr.Method = m.Method
+	ptr.Params = m.Params
+}
+
+func marshalRawMessage(value any) (json.RawMessage, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	data, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.RawMessage(data), nil
 }
