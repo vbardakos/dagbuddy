@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 const rpcVersion = "2.0"
@@ -22,7 +23,7 @@ type Envelope struct {
 // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#requestMessage
 type RequestMessage struct {
 	Version string          `json:"jsonrpc"`
-	ID      any             `json:"id"`
+	ID      ID              `json:"id"`
 	Method  string          `json:"method"`
 	Params  json.RawMessage `json:"params,omitempty"`
 }
@@ -30,7 +31,7 @@ type RequestMessage struct {
 // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#responseMessage
 type ResponseMessage struct {
 	Version string          `json:"jsonrpc"`
-	ID      any             `json:"id"`
+	ID      ID              `json:"id"`
 	Result  json.RawMessage `json:"result,omitempty"`
 	Error   error           `json:"error,omitempty"`
 }
@@ -42,9 +43,18 @@ type NotificationMessage struct {
 	Params  json.RawMessage `json:"params,omitempty"`
 }
 
-func NewResponse(id any, result any, err error) (*ResponseMessage, error) {
-	r, _err := marshalRawMessage(result)
-	return &ResponseMessage{ID: id, Result: r, Error: err}, _err
+type ID struct {
+	value any
+}
+
+func NewRequest(id ID, method string, params any) (*RequestMessage, error) {
+	ps, merr := marshalRawMessage(params)
+	return &RequestMessage{ID: id, Method: method, Params: ps}, merr
+}
+
+func NewResponse(id ID, result any, err error) (*ResponseMessage, error) {
+	r, merr := marshalRawMessage(result)
+	return &ResponseMessage{ID: id, Result: r, Error: err}, merr
 }
 
 func NewNotification(m string, params any) (*NotificationMessage, error) {
@@ -52,16 +62,44 @@ func NewNotification(m string, params any) (*NotificationMessage, error) {
 	return &NotificationMessage{Method: m, Params: ps}, err
 }
 
+func newID(raw any) (ID, error) {
+	var id ID
+	switch raw.(type) {
+	case nil, string, int64:
+		id = ID{value: raw}
+	default:
+		return id, fmt.Errorf("Unknown ID type. Got: %s", raw)
+	}
+	return id, nil
+}
+
+func (id ID) Value() any {
+	return id.value
+}
+
+func (id ID) IsOk() bool {
+	switch id.value.(type) {
+	case string:
+		return true
+	case int64:
+		code := id.value.(int)
+		rpcErrRange := code >= jsonrpcReservedErrorRangeStart.Code && code < jsonrpcReservedErrorRangeEnd.Code
+		return rpcErrRange
+	default:
+		return false
+	}
+}
+
 func (m RequestMessage) marshal(ptr *Envelope) {
 	ptr.Version = m.Version
-	ptr.ID = m.ID
+	ptr.ID = m.ID.value
 	ptr.Method = m.Method
 	ptr.Params = m.Params
 }
 
 func (m ResponseMessage) marshal(ptr *Envelope) {
 	ptr.Version = m.Version
-	ptr.ID = m.ID
+	ptr.ID = m.ID.value
 	ptr.Result = m.Result
 	ptr.Error = m.Error
 }
