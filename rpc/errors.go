@@ -51,7 +51,7 @@ type ResponseError struct {
 	Data    json.RawMessage `json:"data,omitempty"`
 }
 
-func newResponseError(code int, msg string) error {
+func newResponseError(code int, msg string) ResponseError {
 	return ResponseError{Code: code, Message: msg}
 }
 
