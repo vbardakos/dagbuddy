@@ -3,6 +3,7 @@ package rpc
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 )
 
 const rpcVersion = "2.0"
@@ -17,7 +18,7 @@ type Envelope struct {
 	Method  string          `json:"method,omitempty"`
 	Params  json.RawMessage `json:"params,omitempty"`
 	Result  json.RawMessage `json:"result,omitempty"`
-	Error   error           `json:"error,omitempty"`
+	Error   *ResponseError  `json:"error,omitempty"`
 }
 
 // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#requestMessage
@@ -33,7 +34,7 @@ type ResponseMessage struct {
 	Version string          `json:"jsonrpc"`
 	ID      ID              `json:"id"`
 	Result  json.RawMessage `json:"result,omitempty"`
-	Error   error           `json:"error,omitempty"`
+	Error   *ResponseError  `json:"error,omitempty"` // note :: convert into error???
 }
 
 // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notificationMessage
@@ -52,7 +53,7 @@ func NewRequest(id ID, method string, params any) (*RequestMessage, error) {
 	return &RequestMessage{ID: id, Method: method, Params: ps}, merr
 }
 
-func NewResponse(id ID, result any, err error) (*ResponseMessage, error) {
+func NewResponse(id ID, result any, err *ResponseError) (*ResponseMessage, error) {
 	r, merr := marshalRawMessage(result)
 	return &ResponseMessage{ID: id, Result: r, Error: err}, merr
 }
@@ -67,8 +68,11 @@ func newID(raw any) (ID, error) {
 	switch raw.(type) {
 	case nil, string, int64:
 		id = ID{value: raw}
+	case float64:
+		fmt.Fprintf(os.Stderr, "Caught float64: %d", raw)
+		id = ID{value: int64(raw.(float64))}
 	default:
-		return id, fmt.Errorf("Unknown ID type. Got: %s", raw)
+		return id, fmt.Errorf("Unknown ID type. Got: %s\n", raw)
 	}
 	return id, nil
 }
