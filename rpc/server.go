@@ -149,6 +149,44 @@ func (srv *Server) Run(ctx context.Context, handler Handler) error {
 	}
 }
 
+func (srv *Server) RunOnce(ctx context.Context, handler Handler) error {
+	in := make(chan []byte, 1)
+	out := make(chan []byte, 1)
+	errs := make(chan error, 1)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go srv.Read(ctx, in, errs)
+	go srv.Write(ctx, out, errs)
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+
+	case err := <-errs:
+		srv.opts.OnError(err)
+		return err
+
+	case msg, ok := <-in:
+		if !ok {
+			return nil
+		}
+
+		resp, err := handler.Handle(ctx, msg)
+		if err != nil {
+			srv.opts.OnError(err)
+			if srv.opts.Shutdown == FailFast {
+				return err
+			}
+		}
+
+		out <- resp
+		close(out)
+		return nil
+	}
+}
+
 func defaultOpts() Options {
 	return Options{
 		InSize:   0,
