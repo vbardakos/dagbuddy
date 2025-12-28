@@ -5,11 +5,18 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 )
 
-type LspCodec struct{}
+type lspCodec struct {
+	Log *log.Logger
+}
 
-func (LspCodec) Read(_ context.Context, r *bufio.Reader) ([]byte, error) {
+func NewLspCodec(l *log.Logger) *lspCodec {
+	return &lspCodec{Log: l}
+}
+
+func (c lspCodec) Read(_ context.Context, r *bufio.Reader) ([]byte, error) {
 	var msgLen int
 	for {
 		header, err := r.ReadString('\n')
@@ -23,19 +30,20 @@ func (LspCodec) Read(_ context.Context, r *bufio.Reader) ([]byte, error) {
 
 		fmt.Sscanf(header, "Content-Length: %d", &msgLen)
 	}
-
+	c.Log.Printf("Messsage Length: %d\n", msgLen)
 	msg := make([]byte, msgLen)
 	_, err := io.ReadFull(r, msg)
+	c.Log.Printf("Read Messsage: %s. Err?: %s\n", msg, err)
 	return msg, err
 }
 
-func (LspCodec) Write(ctx context.Context, w *bufio.Writer, msg []byte) error {
+func (c lspCodec) Write(ctx context.Context, w *bufio.Writer, msg []byte) error {
+	if msg == nil {
+		return nil
+	}
+
+	c.Log.Printf("Write Message: %s", msg)
 	fmt.Fprintf(w, "Content-Length: %d\r\n\r\n", len(msg))
 	_, err := w.Write(msg)
 	return err
 }
-
-func NewLspCodec() *LspCodec {
-	return &LspCodec{}
-}
-

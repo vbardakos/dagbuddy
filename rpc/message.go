@@ -3,65 +3,75 @@ package rpc
 import (
 	"encoding/json"
 	"fmt"
-	"os"
+	"math"
 )
 
-func EncodeMessage(msg Message) ([]byte, error) {
-	env := Envelope{Version: rpcVersion}
-	msg.marshal(&env)
-
-	data, err := json.Marshal(msg)
-
-	if err != nil {
-		return []byte{}, err
-	}
-
-	return data, nil
+type Message interface {
+	marshal(ptr *envelope)
 }
 
-func DecodeMessage(data []byte) (Message, error) {
-	env := Envelope{}
-	if err := json.Unmarshal(data, &env); err != nil {
-		return nil, err
+// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#requestMessage
+type RequestMessage struct {
+	ID     ID              `json:"id"`
+	Method string          `json:"method"`
+	Params json.RawMessage `json:"params,omitempty"`
+}
+
+// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#responseMessage
+type ResponseMessage struct {
+	ID     ID              `json:"id"`
+	Result json.RawMessage `json:"result,omitempty"`
+	Error  *ResponseError  `json:"error,omitempty"` // note :: convert into error???
+}
+
+// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notificationMessage
+type NotificationMessage struct {
+	Version string          `json:"jsonrpc"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params,omitempty"`
+}
+
+func NewRequest(id ID, method string, params any) (*RequestMessage, error) {
+	ps, merr := marshalRawMessage(params)
+	return &RequestMessage{ID: id, Method: method, Params: ps}, merr
+}
+
+func NewResponse(id ID, result any, err *ResponseError) (*ResponseMessage, error) {
+	r, merr := marshalRawMessage(result)
+	return &ResponseMessage{ID: id, Result: r, Error: err}, merr
+}
+
+func NewNotification(m string, params any) (*NotificationMessage, error) {
+	ps, err := marshalRawMessage(params)
+	return &NotificationMessage{Method: m, Params: ps}, err
+}
+
+func (m RequestMessage) marshal(ptr *envelope) {
+	ptr.ID = m.ID.Value()
+	ptr.Method = m.Method
+	ptr.Params = m.Params
+}
+
+func (m ResponseMessage) marshal(ptr *envelope) {
+	ptr.ID = m.ID.Value()
+	ptr.Result = m.Result
+	ptr.Error = m.Error
+}
+
+func (m NotificationMessage) marshal(ptr *envelope) {
+	ptr.Method = m.Method
+	ptr.Params = m.Params
+}
+
+func marshalRawMessage(value any) (json.RawMessage, error) {
+	if value == nil {
+		return nil, nil
 	}
 
-	fmt.Fprintf(os.Stderr, "Envelope: %+v", env)
-
-	if env.Version != rpcVersion {
-		return nil, fmt.Errorf("Expected version: %s. Got: %s", rpcVersion, env.Version)
-	}
-
-	if env.ID == nil {
-		return NotificationMessage{
-			Version: env.Version,
-			Method:  env.Method,
-			Params:  env.Params,
-		}, nil
-	}
-
-	id, err := newID(env.ID)
+	data, err := json.Marshal(value)
 	if err != nil {
 		return nil, err
 	}
 
-	// Method -> Request | Notification
-	if env.Method != "" {
-		return RequestMessage{
-			Version: env.Version,
-			ID:      id,
-			Method:  env.Method,
-			Params:  env.Params,
-		}, nil
-	}
-
-	if env.Error != nil {
-		return nil, fmt.Errorf("Response Error: %s\n", env.Error)
-	}
-
-	return ResponseMessage{
-		Version: env.Version,
-		ID:      id,
-		Result:  env.Result,
-		Error:   env.Error,
-	}, nil
+	return json.RawMessage(data), nil
 }
