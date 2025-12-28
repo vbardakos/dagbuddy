@@ -52,6 +52,10 @@ func DecodeMessage(data []byte) (Message, error) {
 		return nil, env.Error
 	}
 
+	if len(env.Result) == 0 {
+		return nil, InternalError
+	}
+
 	return ResponseMessage{
 		ID:     id,
 		Result: env.Result,

@@ -2,8 +2,6 @@ package rpc
 
 import (
 	"encoding/json"
-	"fmt"
-	"math"
 )
 
 type Message interface {
@@ -26,9 +24,8 @@ type ResponseMessage struct {
 
 // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#notificationMessage
 type NotificationMessage struct {
-	Version string          `json:"jsonrpc"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params,omitempty"`
+	Method string          `json:"method"`
+	Params json.RawMessage `json:"params,omitempty"`
 }
 
 func NewRequest(id ID, method string, params any) (*RequestMessage, error) {
