@@ -197,8 +197,15 @@ func TestDecodeMessage(t *testing.T) {
 			name: "InternalError",
 			data: []byte("{\"jsonrpc\": \"2.0\", \"id\": 10}"),
 			want: rpc.ResponseMessage{
-				ID:    id,
 				Error: &rpc.InternalError,
+			},
+			wantErr: true,
+		},
+		{
+			name: "ID::ParseError",
+			data: []byte("{\"jsonrpc\": \"2.0\", \"id\": 10.2,\"result\":{}}"),
+			want: rpc.ResponseMessage{
+				Error: &rpc.ParseError,
 			},
 			wantErr: true,
 		},
