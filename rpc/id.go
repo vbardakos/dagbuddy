@@ -5,33 +5,36 @@ import (
 )
 
 type ID struct {
-	str *string
-	num *int64
+	value any
 }
 
+// note :: jsonrpc expects numeric or string
 func NewID(raw any) (ID, error) {
+	var id ID
+
 	if s, ok := raw.(string); ok {
-		return ID{str: &s}, nil
+		id.value = s
+	}
+
+	// note :: numerics expected to be parsed as f64
+	if n, ok := raw.(float64); ok {
+		if math.Trunc(n) != n {
+			return id, ParseError
+		}
+		id.value = int64(n)
 	}
 
 	if n, ok := raw.(int); ok {
-		int := int64(n)
-		return ID{num: &int}, nil
+		id.value = int64(n)
 	}
 
-	if n, ok := raw.(float64); ok {
-		if math.Trunc(n) == n {
-			int := int64(n)
-			return ID{num: &int}, nil
-		}
+	if id.value == nil {
+		return id, ParseError
 	}
 
-	return ID{}, ParseError
+	return id, nil
 }
 
 func (id ID) Value() any {
-	if id.str != nil {
-		return *id.str
-	}
-	return *id.num
+	return id.value
 }
