@@ -6,31 +6,30 @@ import (
 
 func TestNewID(t *testing.T) {
 	tests := []struct {
-		name string // description of this test case
-		// Named input parameters for target function.
+		name    string
 		raw     any
 		want    ID
 		wantErr bool
 	}{
 		{
 			name: "Float64",
-			raw: float64(10.0),
+			raw:  float64(10.0),
 			want: ID{value: int64(10)},
 		},
 		{
 			name: "String",
-			raw: "hello world",
+			raw:  "hello world",
 			want: ID{value: "hello world"},
 		},
 		{
 			name: "Integer",
-			raw: 10,
+			raw:  10,
 			want: ID{value: int64(10)},
 		},
 		{
-			name: "Invalid",
-			raw: nil,
-			want: ID{value: nil},
+			name:    "Invalid",
+			raw:     nil,
+			want:    ID{value: nil},
 			wantErr: true,
 		},
 	}
@@ -44,16 +43,14 @@ func TestNewID(t *testing.T) {
 				return
 			}
 			if tt.wantErr {
-				if gotErr.Error() != InternalError.Error() {
-						t.Fatal("NewID() succeeded unexpectedly")
+				if gotErr == nil || gotErr.Error() != InternalError.Error() {
+					t.Fatal("NewID() succeeded unexpectedly")
 				}
 				return
 			}
-			// TODO: update the condition below to compare got with tt.want.
 			if got != tt.want {
 				t.Errorf("NewID() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
-
