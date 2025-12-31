@@ -1,10 +1,10 @@
-package rpc
+package protocol
 
 import "encoding/json"
 
 const rpcVersion = "2.0"
 
-// generic container of a message
+// generic message container
 type envelope struct {
 	Version string          `json:"jsonrpc"`
 	ID      any             `json:"id,omitempty"`
@@ -14,6 +14,14 @@ type envelope struct {
 	Error   *ResponseError  `json:"error,omitempty"`
 }
 
-func versionedEnvelope() envelope {
+func NewEmptyEnvelope() envelope {
+	return envelope{}
+}
+
+func NewVersionedEnvelope() envelope {
 	return envelope{Version: rpcVersion}
+}
+
+func (e envelope) VersionOk() bool {
+	return e.Version == rpcVersion
 }

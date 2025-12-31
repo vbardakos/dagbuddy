@@ -1,11 +1,20 @@
-package rpc
+package protocol
 
 import (
 	"encoding/json"
 )
 
-type Message interface {
-	marshal(ptr *envelope)
+type RPCKind int
+
+const (
+	RequestKind RPCKind = iota
+	ResponseKind
+	NotificationKind
+)
+
+type RPCMessage interface {
+	Type() RPCKind
+	Marshal(ptr *envelope)
 }
 
 // https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#requestMessage
@@ -43,19 +52,31 @@ func NewNotification(m string, params any) (*NotificationMessage, error) {
 	return &NotificationMessage{Method: m, Params: ps}, err
 }
 
-func (m RequestMessage) marshal(ptr *envelope) {
+func (RequestMessage) Type() RPCKind {
+	return RequestKind
+}
+
+func (ResponseMessage) Type() RPCKind {
+	return ResponseKind
+}
+
+func (NotificationMessage) Type() RPCKind {
+	return NotificationKind
+}
+
+func (m RequestMessage) Marshal(ptr *envelope) {
 	ptr.ID = m.ID.Value()
 	ptr.Method = m.Method
 	ptr.Params = m.Params
 }
 
-func (m ResponseMessage) marshal(ptr *envelope) {
+func (m ResponseMessage) Marshal(ptr *envelope) {
 	ptr.ID = m.ID.Value()
 	ptr.Result = m.Result
 	ptr.Error = m.Error
 }
 
-func (m NotificationMessage) marshal(ptr *envelope) {
+func (m NotificationMessage) Marshal(ptr *envelope) {
 	ptr.Method = m.Method
 	ptr.Params = m.Params
 }

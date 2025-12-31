@@ -1,19 +1,20 @@
-package rpc_test
+package codec_test
 
 import (
 	"encoding/json"
 	"reflect"
 	"testing"
 
-	"github.com/vbardakos/dagbuddy/rpc"
+	p "github.com/vbardakos/dagbuddy/rpc/protocol"
+	c "github.com/vbardakos/dagbuddy/rpc/codec"
 )
 
-func msgEquals(m1 rpc.Message, m2 rpc.Message) bool {
-	if r1, ok := m1.(rpc.RequestMessage); ok {
+func msgEquals(m1 p.RPCMessage, m2 p.RPCMessage) bool {
+	if r1, ok := m1.(p.RequestMessage); ok {
 		var p1 string
 		json.Unmarshal(r1.Params, &p1)
 
-		if r2, ok := m2.(rpc.RequestMessage); ok {
+		if r2, ok := m2.(p.RequestMessage); ok {
 			var p2 string
 			json.Unmarshal(r2.Params, &p2)
 			return r1.ID.Value() == r2.ID.Value() && r1.Method == r2.Method && p1 == p2
@@ -22,11 +23,11 @@ func msgEquals(m1 rpc.Message, m2 rpc.Message) bool {
 		return false
 	}
 
-	if n1, ok := m1.(rpc.NotificationMessage); ok {
+	if n1, ok := m1.(p.NotificationMessage); ok {
 		var p1 string
 		json.Unmarshal(n1.Params, &p1)
 
-		if n2, ok := m2.(rpc.NotificationMessage); ok {
+		if n2, ok := m2.(p.NotificationMessage); ok {
 			var p2 string
 			json.Unmarshal(n2.Params, &p2)
 			return n1.Method == n2.Method && p1 == p2
@@ -35,11 +36,11 @@ func msgEquals(m1 rpc.Message, m2 rpc.Message) bool {
 		return false
 	}
 
-	if r1, ok := m1.(rpc.ResponseMessage); ok {
+	if r1, ok := m1.(p.ResponseMessage); ok {
 		var res1 string
 		json.Unmarshal(r1.Result, &res1)
 
-		if r2, ok := m2.(rpc.ResponseMessage); ok {
+		if r2, ok := m2.(p.ResponseMessage); ok {
 			var res2 string
 			json.Unmarshal(r2.Result, &res2)
 			return r1.ID.Value() == r2.ID.Value() && r1.Error == r2.Error && res1 == res2
@@ -51,9 +52,9 @@ func msgEquals(m1 rpc.Message, m2 rpc.Message) bool {
 	return false
 }
 
-func errEquals(err error, msg rpc.Message) bool {
-	if r, ok := msg.(rpc.ResponseMessage); ok {
-		if rerr, ok := err.(rpc.ResponseError); ok {
+func errEquals(err error, msg p.RPCMessage) bool {
+	if r, ok := msg.(p.ResponseMessage); ok {
+		if rerr, ok := err.(p.ResponseError); ok {
 			return rerr.Code == r.Error.Code && rerr.Message == r.Error.Message
 		}
 	}
@@ -61,17 +62,17 @@ func errEquals(err error, msg rpc.Message) bool {
 }
 
 func TestEncodeMessage(t *testing.T) {
-	id, _ := rpc.NewID(10)
+	id, _ := p.NewID(10)
 
 	tests := []struct {
 		name    string
-		msg     rpc.Message
+		msg     p.RPCMessage
 		want    []byte
 		wantErr bool
 	}{
 		{
-			name: "Request",
-			msg: rpc.RequestMessage{
+			name: "request",
+			msg: p.RequestMessage{
 				ID:     id,
 				Method: "method",
 				Params: json.RawMessage("{\"value\": \"hello\"}"),
@@ -80,8 +81,8 @@ func TestEncodeMessage(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Notification",
-			msg: rpc.NotificationMessage{
+			name: "notification",
+			msg: p.NotificationMessage{
 				Method: "method",
 				Params: json.RawMessage("{\"value\": \"hello\"}"),
 			},
@@ -89,8 +90,8 @@ func TestEncodeMessage(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ResponseResult",
-			msg: rpc.ResponseMessage{
+			name: "response result",
+			msg: p.ResponseMessage{
 				ID:     id,
 				Result: json.RawMessage("{\"value\": \"hello\"}"),
 			},
@@ -98,10 +99,10 @@ func TestEncodeMessage(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "ResponseResult",
-			msg: rpc.ResponseMessage{
+			name: "response result",
+			msg: p.ResponseMessage{
 				ID: id,
-				Error: &rpc.ResponseError{
+				Error: &p.ResponseError{
 					Code:    10,
 					Message: "hello",
 				},
@@ -113,7 +114,7 @@ func TestEncodeMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := rpc.EncodeMessage(tt.msg)
+			got, gotErr := c.EncodeMessage(tt.msg)
 			if gotErr != nil {
 				if !tt.wantErr {
 					t.Errorf("EncodeMessage() failed: %v", gotErr)
@@ -133,18 +134,18 @@ func TestEncodeMessage(t *testing.T) {
 }
 
 func TestDecodeMessage(t *testing.T) {
-	id, _ := rpc.NewID(10)
+	id, _ := p.NewID(10)
 
 	tests := []struct {
 		name    string
 		data    []byte
-		want    rpc.Message
+		want    p.RPCMessage
 		wantErr bool
 	}{
 		{
-			name: "Request",
+			name: "request",
 			data: []byte("{\"jsonrpc\": \"2.0\", \"id\": 10, \"method\": \"init\", \"params\": {\"hello\":\"world\"}}"),
-			want: rpc.RequestMessage{
+			want: p.RequestMessage{
 				ID:     id,
 				Method: "init",
 				Params: json.RawMessage([]byte("{\"hello\":\"world\"}")),
@@ -152,41 +153,41 @@ func TestDecodeMessage(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "Request::NoParams",
+			name: "request no params",
 			data: []byte("{\"jsonrpc\": \"2.0\", \"id\": 10, \"method\": \"init\"}"),
-			want: rpc.RequestMessage{
+			want: p.RequestMessage{
 				ID:     id,
 				Method: "init",
 			},
 			wantErr: false,
 		},
 		{
-			name: "Notification",
+			name: "notification",
 			data: []byte("{\"jsonrpc\": \"2.0\", \"method\": \"init\", \"params\": {\"hello\":\"world\"}}"),
-			want: rpc.NotificationMessage{
+			want: p.NotificationMessage{
 				Method: "init",
 				Params: json.RawMessage([]byte("{\"hello\":\"world\"}")),
 			},
 			wantErr: false,
 		},
 		{
-			name:    "Notification::NoParams",
+			name:    "notification no params",
 			data:    []byte("{\"jsonrpc\": \"2.0\", \"method\": \"init\"}"),
-			want:    rpc.NotificationMessage{Method: "init"},
+			want:    p.NotificationMessage{Method: "init"},
 			wantErr: false,
 		},
 		{
-			name:    "Response::Result",
+			name:    "response result",
 			data:    []byte("{\"jsonrpc\": \"2.0\", \"id\": 10, \"result\": {\"init\": 0}}"),
-			want:    rpc.ResponseMessage{ID: id, Result: json.RawMessage([]byte("{\"init\": 0}"))},
+			want:    p.ResponseMessage{ID: id, Result: json.RawMessage([]byte("{\"init\": 0}"))},
 			wantErr: false,
 		},
 		{
-			name: "Response::Error",
+			name: "response error",
 			data: []byte("{\"jsonrpc\": \"2.0\", \"id\": 10, \"error\": {\"code\": 0, \"message\": \"hello\"}}"),
-			want: rpc.ResponseMessage{
+			want: p.ResponseMessage{
 				ID: id,
-				Error: &rpc.ResponseError{
+				Error: &p.ResponseError{
 					Code:    0,
 					Message: "hello",
 				},
@@ -194,25 +195,25 @@ func TestDecodeMessage(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "InternalError",
+			name: "error InternalError",
 			data: []byte("{\"jsonrpc\": \"2.0\", \"id\": 10}"),
-			want: rpc.ResponseMessage{
-				Error: &rpc.InternalError,
+			want: p.ResponseMessage{
+				Error: &p.InternalError,
 			},
 			wantErr: true,
 		},
 		{
-			name: "ID::ParseError",
+			name: "error ParseError (from ID)",
 			data: []byte("{\"jsonrpc\": \"2.0\", \"id\": 10.2,\"result\":{}}"),
-			want: rpc.ResponseMessage{
-				Error: &rpc.ParseError,
+			want: p.ResponseMessage{
+				Error: &p.ParseError,
 			},
 			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := rpc.DecodeMessage(tt.data)
+			got, gotErr := c.DecodeMessage(tt.data)
 			if gotErr != nil {
 				if !tt.wantErr {
 					if !errEquals(gotErr, tt.want) || got != nil {

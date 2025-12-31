@@ -1,4 +1,4 @@
-package rpc
+package protocol
 
 import (
 	"testing"
@@ -12,22 +12,22 @@ func TestNewID(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Float64",
+			name: "type f64",
 			raw:  float64(10.0),
 			want: ID{value: int64(10)},
 		},
 		{
-			name: "String",
+			name: "type string",
 			raw:  "hello world",
 			want: ID{value: "hello world"},
 		},
 		{
-			name: "Integer",
+			name: "type integer",
 			raw:  10,
 			want: ID{value: int64(10)},
 		},
 		{
-			name:    "Invalid",
+			name:    "error invalid",
 			raw:     nil,
 			want:    ID{value: nil},
 			wantErr: true,

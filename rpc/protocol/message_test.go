@@ -1,11 +1,11 @@
-package rpc
+package protocol
 
 import (
 	"encoding/json"
 	"testing"
 )
 
-func equalEnvironments(e1 envelope, e2 envelope) bool {
+func equalEnvelopes(e1 envelope, e2 envelope) bool {
 	sanity := e1.Version == e2.Version && e1.ID == e2.ID && e1.Method == e2.Method && (e1.Error == nil) == (e2.Error == nil)
 	if !sanity {
 		return false
@@ -45,10 +45,10 @@ func equalEnvironments(e1 envelope, e2 envelope) bool {
 	return true
 }
 
-func TestResponseMessage_marshal(t *testing.T) {
+func TestMessage_Marshal(t *testing.T) {
 	tests := []struct {
 		name string
-		data Message
+		data RPCMessage
 		got  envelope
 	}{
 		{
@@ -146,8 +146,8 @@ func TestResponseMessage_marshal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := envelope{}
-			tt.data.marshal(&e)
-			if !equalEnvironments(e, tt.got) {
+			tt.data.Marshal(&e)
+			if !equalEnvelopes(e, tt.got) {
 				t.Fatalf("envelopes do not match: %+v; want: %+v", e, tt.got)
 			}
 		})
