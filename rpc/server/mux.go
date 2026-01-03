@@ -24,26 +24,15 @@ func NewMultiplexer(r io.Reader, w io.Writer, c Codec, s Selector, opts ...Optio
 	return mx
 }
 
-func (mx *mux) setSessionBuilder(ctx context.Context) context.Context {
-	if mx.opts.SessionBuilder == nil {
-		return ctx
-	}
-	ns := mx.opts.SessionBuilder
-	mx.opts.SessionBuilder = nil
-
-	sm := newSessionManager(ns)
-	return sm.attach(ctx)
-}
-
 func (mx *mux) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
-	ctx = mx.setSessionBuilder(ctx)
+	ctx = mx.attachSessionManager(ctx)
 	defer cancel()
 
-	in := make(chan p.RPCMessage, mx.opts.InSize)
-	out := make(chan p.RPCMessage, mx.opts.OutSize)
-	errs := make(chan error, 1)
+	var pendingDone bool
+	ctx, doneNow, doneAfter := mx.setupDoneCapabilities(ctx)
 
+	in, out, errs := mx.setupIOChans()
 	go mx.readLoop(ctx, in, errs)
 	go mx.writeLoop(ctx, out, errs)
 
@@ -57,27 +46,44 @@ func (mx *mux) Run(ctx context.Context) error {
 		select {
 
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil
 
+		// user immediate shutdown
+		case <-doneNow:
+			cancel()
+			return nil
+
+		// user shutdown after dispatch
+		case <-doneAfter:
+			pendingDone = true
+
+		// Handle error handling
 		case err := <-errs:
 			mx.opts.OnError(err)
 			if mx.opts.Shutdown == FailFast {
 				return err
 			}
 
+		// happy path
 		case msg, ok := <-in:
 			if !ok {
 				return nil
 			}
 
 			dispatcher.dispatch(ctx, msg)
+
+			if pendingDone {
+				cancel()
+				return nil
+			}
 		}
 	}
 }
 
+// TODO :: use doneAfter for cleaner implementation
 func (mx *mux) SingleHandshake(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
-	ctx = mx.setSessionBuilder(ctx)
+	ctx = mx.attachSessionManager(ctx)
 	defer cancel()
 
 	br := bufio.NewReader(mx.r)
@@ -178,4 +184,30 @@ func (mx *mux) writeLoop(ctx context.Context, out <-chan p.RPCMessage, errs chan
 			}
 		}
 	}
+}
+
+func (mx *mux) attachSessionManager(ctx context.Context) context.Context {
+	if mx.opts.SessionManager == nil {
+		return ctx
+	}
+	sm := mx.opts.SessionManager
+	mx.opts.SessionManager = nil
+
+	return sm.Attach(ctx)
+}
+
+func (mx *mux) setupIOChans() (in chan p.RPCMessage, out chan p.RPCMessage, errs chan error) {
+	in = make(chan p.RPCMessage, mx.opts.InSize)
+	out = make(chan p.RPCMessage, mx.opts.OutSize)
+	errs = make(chan error, 1)
+	return
+}
+
+func (mx *mux) setupDoneCapabilities(ctxin context.Context) (ctx context.Context, done chan struct{}, doneAfter chan struct{}) {
+	done = make(chan struct{}, 1)
+	ctx = attachDoneNowContextValue(ctxin, done)
+
+	doneAfter = make(chan struct{}, 1)
+	ctx = attachDoneAfterContextValue(ctx, doneAfter)
+	return
 }

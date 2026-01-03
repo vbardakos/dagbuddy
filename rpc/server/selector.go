@@ -27,6 +27,6 @@ func SelectByType(req Handler, resp Handler, not Handler) Selector {
 	}
 }
 
-func NewSingleSelector(h Handler) Selector {
+func NewHandlerSelector(h Handler) Selector {
 	return func(msg p.RPCMessage) Handler { return h }
 }
