@@ -1,5 +1,9 @@
 package server
 
+import (
+	s "github.com/vbardakos/dagbuddy/rpc/session"
+)
+
 type ShutdownMode int
 type FlushMode int
 
@@ -19,7 +23,7 @@ type Options struct {
 	Shutdown       ShutdownMode
 	Flush          FlushMode
 	OnError        func(error)
-	SessionBuilder func(id SessionID) Session
+	SessionManager s.SessionManager
 }
 
 func defaultOpts() Options {
@@ -32,18 +36,38 @@ func defaultOpts() Options {
 	}
 }
 
-func WithSession(fn func(id SessionID) Session) OptionFunc {
+func WithSessionManager(sm func() s.SessionManager) OptionFunc {
 	return func(o *Options) {
-		o.SessionBuilder = fn
+		o.SessionManager = sm()
 	}
 }
 
-func WithDefaultManager(o *Options) {
-	WithSession(NewDefaultSession)(o)
+func WithSession(o *Options) {
+	o.SessionManager = s.NewSingleSessionManager()
+}
+
+func WithUserSession[ST any](fn func() *ST) OptionFunc {
+	return func(o *Options) {
+		o.SessionManager = s.NewGenPhantomManager(fn)
+	}
+}
+
+func WithMultiSessionManager(o *Options) {
+	o.SessionManager = s.NewMultiSessionManager()
+}
+
+func WithUserMultiSessionManager[ID comparable, ST any](fn func(ID) *ST) OptionFunc {
+	return func(o *Options) {
+		o.SessionManager = s.NewGenMapManager(fn)
+	}
 }
 
 func DrainErrors(o *Options) {
 	o.Shutdown = Drain
+}
+
+func ExitOnError(o *Options) {
+	o.Shutdown = FailFast
 }
 
 func MaxInSize(n int) OptionFunc {
