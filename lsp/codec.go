@@ -6,20 +6,21 @@ import (
 	"fmt"
 	"io"
 	"log"
+
+	"github.com/vbardakos/dagbuddy/rpc"
 )
 
-type lspCodec struct {
+type LspCodec struct {
 	Log *log.Logger
 }
 
-func NewLspCodec(l *log.Logger) *lspCodec {
-	return &lspCodec{Log: l}
-}
-
-func (c lspCodec) Read(_ context.Context, r *bufio.Reader) ([]byte, error) {
+func (c *LspCodec) Read(_ context.Context, r *bufio.Reader) (rpc.Message, error) {
 	var msgLen int
+
+	// note :: read header; head & msg split by double \r\n
 	for {
 		header, err := r.ReadString('\n')
+
 		if err != nil {
 			return nil, err
 		}
@@ -30,20 +31,26 @@ func (c lspCodec) Read(_ context.Context, r *bufio.Reader) ([]byte, error) {
 
 		fmt.Sscanf(header, "Content-Length: %d", &msgLen)
 	}
-	c.Log.Printf("Messsage Length: %d\n", msgLen)
-	msg := make([]byte, msgLen)
-	_, err := io.ReadFull(r, msg)
-	c.Log.Printf("Read Messsage: %s. Err?: %s\n", msg, err)
-	return msg, err
+
+	data := make([]byte, msgLen)
+	if _, err := io.ReadFull(r, data); err != nil {
+		return nil, err
+	}
+
+	return rpc.Decode(data)
 }
 
-func (c lspCodec) Write(ctx context.Context, w *bufio.Writer, msg []byte) error {
-	if msg == nil {
+func (c *LspCodec) Write(ctx context.Context, w *bufio.Writer, msg rpc.Message) error {
+	if msg.Type() == rpc.NotificationKind {
 		return nil
 	}
 
-	c.Log.Printf("Write Message: %s", msg)
-	fmt.Fprintf(w, "Content-Length: %d\r\n\r\n", len(msg))
-	_, err := w.Write(msg)
+	data, err := rpc.Encode(msg)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(w, "Content-Length: %d\r\n\r\n", len(data))
+	_, err = w.Write(data)
 	return err
 }
