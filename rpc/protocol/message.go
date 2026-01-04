@@ -10,6 +10,7 @@ const (
 	RequestKind RPCKind = iota
 	ResponseKind
 	NotificationKind
+	VoidKind
 )
 
 type RPCMessage interface {
@@ -37,6 +38,8 @@ type NotificationMessage struct {
 	Params json.RawMessage `json:"params,omitempty"`
 }
 
+type NoResponseMessage struct{}
+
 func NewRequest(id ID, method string, params any) (*RequestMessage, error) {
 	ps, merr := marshalRawMessage(params)
 	return &RequestMessage{ID: id, Method: method, Params: ps}, merr
@@ -63,6 +66,12 @@ func (ResponseMessage) Type() RPCKind {
 func (NotificationMessage) Type() RPCKind {
 	return NotificationKind
 }
+
+func (NoResponseMessage) Type() RPCKind {
+	return VoidKind
+}
+
+func (NoResponseMessage) Marshal(ptr *envelope) {}
 
 func (m RequestMessage) Marshal(ptr *envelope) {
 	ptr.ID = m.ID.Value()

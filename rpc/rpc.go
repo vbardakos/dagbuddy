@@ -43,6 +43,7 @@ var (
 	NewResponse     = protocol.NewResponse
 	NewRequest      = protocol.NewRequest
 	NewNotification = protocol.NewNotification
+	NoResponse      = protocol.NoResponseMessage{}
 	InternalError   = protocol.InternalError
 	ParseError      = protocol.ParseError
 

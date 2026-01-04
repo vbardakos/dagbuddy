@@ -27,7 +27,7 @@ func (d *dispatcher) dispatch(ctx context.Context, msg p.RPCMessage) {
 			return
 		}
 
-		if r.Type() == p.NotificationKind {
+		if r.Type() == p.VoidKind {
 			return
 		}
 
