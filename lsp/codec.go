@@ -5,14 +5,11 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/vbardakos/dagbuddy/rpc"
 )
 
-type LspCodec struct {
-	Log *log.Logger
-}
+type LspCodec struct{}
 
 func (c *LspCodec) Read(_ context.Context, r *bufio.Reader) (rpc.Message, error) {
 	var msgLen int
@@ -40,11 +37,8 @@ func (c *LspCodec) Read(_ context.Context, r *bufio.Reader) (rpc.Message, error)
 	return rpc.Decode(data)
 }
 
+// Dispatcher takes care of NoResponse
 func (c *LspCodec) Write(ctx context.Context, w *bufio.Writer, msg rpc.Message) error {
-	if msg.Type() == rpc.NotificationKind {
-		return nil
-	}
-
 	data, err := rpc.Encode(msg)
 	if err != nil {
 		return err
