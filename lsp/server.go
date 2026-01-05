@@ -16,7 +16,7 @@ func RunLspServer(l *log.Logger, o ...rpc.UserOption) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	r, w := stdIO()
-	o = append(o, rpc.WithUserSingleSession(wrappedSession(l)))
+	o = append(o, rpc.WithUserSession(wrappedSession(l)))
 
 	s := rpc.NewServer(r, w, &LspCodec{Log: l}, h.NewSelector(l), o...)
 	return s.Run(ctx)
