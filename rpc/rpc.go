@@ -21,21 +21,23 @@ type (
 	UserOption     = server.OptionFunc
 	UserCodec      = server.Codec
 	Options        = server.Options
+
+	SessionManager = session.SessionManager
 )
 
 var (
 	NewServer = server.NewMultiplexer
 
 	// Options
-	WithSingleSession       = server.WithSession
-	WithMultiSessionManager = server.WithMultiSessionManager
-	WithUserManager         = server.WithSessionManager
-	WithErrorDrain          = server.DrainErrors
-	WithErrorFail           = server.ExitOnError
-	WithInCapacity          = server.MaxInSize
-	WithOutCapacity         = server.MaxOutSize
-	WithOnError             = server.OnError
-	WithoutFlushing         = server.WithoutFlush
+	WithDefaultSession = server.WithSession
+	WithDefaultManager = server.WithMultiSessionManager
+	WithNewManager     = server.WithSessionManager
+	WithErrorDrain     = server.DrainErrors
+	WithErrorFail      = server.ExitOnError
+	WithInCapacity     = server.MaxInSize
+	WithOutCapacity    = server.MaxOutSize
+	WithOnError        = server.OnError
+	WithoutFlushing    = server.WithoutFlush
 
 	NewTypeSelector    = server.SelectByType
 	NewHanlderSelector = server.NewHandlerSelector
@@ -47,8 +49,10 @@ var (
 	InternalError   = protocol.InternalError
 	ParseError      = protocol.ParseError
 
-	GetSingleSession       = session.GetPhantomFromContext[any]
-	GetMultiSessionManager = session.GetMapFromContext[any]
+	NewDefaultSession = session.NewSingleSessionManager
+	NewDefaultManager = session.NewMultiSessionManager
+	GetDefaultSession = session.GetPhantomFromContext[any]
+	GetDefaultManager = session.GetGenMapFromContext[string, any]
 
 	Encode = codec.EncodeMessage
 	Decode = codec.DecodeMessage
@@ -65,11 +69,11 @@ const (
 	NotificationKind = protocol.NotificationKind
 )
 
-func WithUserSingleSession[ST any](fn func() *ST) UserOption {
+func WithUserSession[ST any](fn func() *ST) UserOption {
 	return server.WithUserSession(fn)
 }
 
-func WithUserMultiSession[ID comparable, ST any](fn func(ID) *ST) UserOption {
+func WithUserSessionManager[ID comparable, ST any](fn func(ID) *ST) UserOption {
 	return server.WithUserMultiSessionManager(fn)
 }
 
@@ -77,6 +81,6 @@ func GetUserSession[ST any](ctx context.Context) *ST {
 	return session.GetPhantomFromContext[ST](ctx)
 }
 
-func GetUserMultiSession[ST any](ctx context.Context) *ST {
-	return session.GetMapFromContext[ST](ctx)
+func GetUserSessionManager[ID comparable, ST any](ctx context.Context) *session.MapManager[ID, ST] {
+	return session.GetGenMapFromContext[ID, ST](ctx)
 }

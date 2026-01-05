@@ -17,8 +17,8 @@ func NewGenMapManager[ID comparable, ST any](fn func(ID) *ST) *safemapManager[ID
 	return &safemapManager[ID, ST]{ss: i.NewMap[ID, *ST](), newFn: fn}
 }
 
-func GetMapFromContext[T any](ctx context.Context) *T {
-	return ctx.Value(mapManagerID{}).(*T)
+func GetGenMapFromContext[ID comparable, T any](ctx context.Context) *safemapManager[ID, T] {
+	return ctx.Value(mapManagerID{}).(*safemapManager[ID, T])
 }
 
 func (sm *safemapManager[ID, ST]) Attach(ctx context.Context) context.Context {
